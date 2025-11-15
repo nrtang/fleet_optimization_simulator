@@ -147,13 +147,14 @@ def create_optimization_model_from_config(config: Config):
         raise ValueError(f"Unknown model type: {model_type}")
 
 
-def run_simulation(config_path: str, verbose: bool = True):
+def run_simulation(config_path: str, verbose: bool = True, collect_training_data: bool = False):
     """
     Run a simulation from a configuration file.
 
     Args:
         config_path: Path to YAML configuration file
         verbose: Whether to print progress
+        collect_training_data: Whether to collect ML training data
     """
     # Load configuration
     if verbose:
@@ -193,7 +194,8 @@ def run_simulation(config_path: str, verbose: bool = True):
         time_step_minutes=sim_params.get('time_step_minutes', 1.0),
         simulation_duration_hours=sim_params['duration_hours'],
         travel_speed_kmh=sim_params.get('travel_speed_kmh', 30.0),
-        optimization_mode=opt_mode
+        optimization_mode=opt_mode,
+        collect_training_data=collect_training_data
     )
 
     # Run simulation

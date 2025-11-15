@@ -319,6 +319,147 @@ weekend_pattern = DemandPattern(
 )
 ```
 
+## Machine Learning Training
+
+The simulator includes comprehensive infrastructure for generating training data and evaluating ML models.
+
+### Generating Training Data
+
+**Collect data during a single simulation:**
+```bash
+python -m fleet_optimizer.cli run configs/default.yaml --collect-training-data
+```
+
+**Generate large-scale training dataset:**
+```bash
+# Generate 100 episodes with default config
+python scripts/generate_training_data.py --episodes 100
+
+# Use multiple configurations for diversity
+python scripts/generate_training_data.py \
+    --configs configs/rule_based.yaml configs/default.yaml configs/event_driven.yaml \
+    --episodes 200 \
+    --output training_data \
+    --format pickle
+```
+
+### What Gets Collected
+
+For each decision point (every minute or event-driven trigger):
+- **State snapshot**: Vehicle locations, battery levels, pending requests, depot states
+- **Actions taken**: All decisions made by the optimization model
+- **Rewards**: Immediate reward (revenue, penalties, bonuses)
+- **Metrics**: Available vehicles, utilization, wait times
+
+**Data volume:**
+- ~50-100 MB per 24-hour simulation (pickle format)
+- 100 episodes ≈ 5-10 GB training dataset
+
+### Training ML Models
+
+**Example: Imitation Learning**
+```python
+from fleet_optimizer.utils.feature_extraction import StateFeatureExtractor
+import pickle
+
+# Load training data
+with open('training_data/default_episode_0000.pkl', 'rb') as f:
+    episode = pickle.load(f)
+
+# Extract features
+extractor = StateFeatureExtractor()
+states = [extractor.extract_state_features(step['state'])
+          for step in episode['trajectory']]
+actions = [step['actions'] for step in episode['trajectory']]
+
+# Train your model
+model.fit(states, actions)
+```
+
+**Full example:**
+```bash
+# Run the example training script
+python examples/train_ml_model.py
+```
+
+### Features Available
+
+State features extracted automatically:
+- **Temporal**: Hour (sin/cos encoded), day progress
+- **Fleet**: Average/min/max battery, idle ratio, utilization
+- **Depot**: Available slots, queue length, electricity price
+- **Requests**: Pending count, wait times, spatial distribution
+
+See `fleet_optimizer/utils/feature_extraction.py` for complete list.
+
+### Using ML Models in Simulation
+
+Create a custom model class:
+```python
+from fleet_optimizer.models.base_model import BaseOptimizationModel
+import torch
+
+class MLModel(BaseOptimizationModel):
+    def __init__(self, model_path):
+        self.model = torch.load(model_path)
+        self.feature_extractor = StateFeatureExtractor()
+
+    def make_decisions(self, state):
+        # Extract features
+        features = self.feature_extractor.extract_state_features(state)
+
+        # Get predictions from your ML model
+        predictions = self.model(features)
+
+        # Convert predictions to decisions
+        decisions = self._predictions_to_decisions(predictions, state)
+        return decisions
+```
+
+Then use it in your config:
+```yaml
+model:
+  type: ml_model
+  config:
+    model_path: trained_models/my_model.pt
+```
+
+### Supported ML Approaches
+
+**1. Imitation Learning (Behavioral Cloning)**
+- Learn to mimic greedy/rule-based policies
+- Requires: State-action pairs
+- Use case: Bootstrap better-than-random policies
+
+**2. Offline Reinforcement Learning**
+- Learn from logged state-action-reward transitions
+- Requires: Full SARS' tuples
+- Use case: Improve beyond expert demonstrations
+
+**3. Online Reinforcement Learning**
+- Train by running simulations with exploration
+- Requires: Modify optimization model to explore
+- Use case: Discover novel strategies
+
+### Data Generation Strategies
+
+**1. Expert demonstrations (Imitation)**
+```bash
+# Collect data from greedy model
+python scripts/generate_training_data.py --configs configs/default.yaml --episodes 500
+```
+
+**2. Diverse strategies (Coverage)**
+```bash
+# Sweep different parameter configurations
+python scripts/generate_training_data.py \
+    --configs configs/*.yaml \
+    --episodes 200
+```
+
+**3. Exploration (RL)**
+Modify the model to add ε-greedy exploration before running data generation.
+
 ## Performance Considerations
 
 - **Fleet Size**: Tested with up to 1000 vehicles

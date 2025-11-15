@@ -61,6 +61,7 @@ class SimulationEngine:
         distance_func: Optional[Callable] = None,
         travel_speed_kmh: float = 30.0,
         optimization_mode: str = 'fixed_interval',
+        collect_training_data: bool = False,
     ):
         """
         Initialize simulation engine.
@@ -75,6 +76,7 @@ class SimulationEngine:
             distance_func: Function to calculate distance between coordinates
             travel_speed_kmh: Average travel speed
             optimization_mode: 'fixed_interval' or 'event_driven'
+            collect_training_data: Whether to collect training data for ML
         """
         self.fleet = fleet
         self.depots = {depot.id: depot for depot in depots}
@@ -85,6 +87,7 @@ class SimulationEngine:
         self.distance_func = distance_func or self._haversine_distance
         self.travel_speed_kmh = travel_speed_kmh
         self.optimization_mode = optimization_mode
+        self.collect_training_data = collect_training_data
 
         # Simulation state
         self.current_time = 0.0
@@ -96,6 +99,12 @@ class SimulationEngine:
         # Vehicle assignments
         self.vehicle_destinations: Dict[str, Tuple[float, float]] = {}
         self.vehicle_arrival_times: Dict[str, float] = {}
+
+        # Training data collection
+        if self.collect_training_data:
+            self.training_trajectory = []
+            self.last_completed_count = 0
+            self.last_timeout_count = 0
 
         # Initialize event queue
         self._initialize_events()
@@ -233,6 +242,10 @@ class SimulationEngine:
 
     def _handle_optimization_step(self, event: Event):
         """Handle optimization decision-making"""
+        # Capture state BEFORE making decisions (for training data)
+        if self.collect_training_data:
+            state_snapshot = self._capture_state_snapshot()
+
         # Get current state
         state = {
             'current_time': self.current_time,
@@ -248,6 +261,17 @@ class SimulationEngine:
         # Execute decisions
         for decision in decisions:
             self._execute_decision(decision)
+
+        # Record training data AFTER executing decisions
+        if self.collect_training_data:
+            reward = self._calculate_step_reward()
+            self.training_trajectory.append({
+                'timestep': len(self.training_trajectory),
+                'time': self.current_time,
+                'state': state_snapshot,
+                'actions': decisions,
+                'reward': reward,
+            })
 
     def _execute_decision(self, decision: dict):
         """Execute a decision from the optimization model"""
@@ -510,7 +534,7 @@ class SimulationEngine:
         total_requests = len(self.completed_requests) + len(self.cancelled_requests)
         completed_requests = len(self.completed_requests)
 
-        return {
+        results = {
             'simulation_duration_hours': self.simulation_duration_minutes / 60,
             'total_requests': total_requests,
             'completed_requests': completed_requests,
@@ -522,4 +546,142 @@ class SimulationEngine:
                 'completed': [r.get_state_dict() for r in self.completed_requests],
                 'cancelled': [r.get_state_dict() for r in self.cancelled_requests],
             }
+        }
+
+        # Add training data if collected
+        if self.collect_training_data:
+            results['training_data'] = {
+                'trajectory': self.training_trajectory,
+                'num_timesteps': len(self.training_trajectory)
+            }
+
+        return results
+
+    def _capture_state_snapshot(self) -> dict:
+        """
+        Capture complete state snapshot for training data.
+
+        Returns:
+            Dictionary with complete state information
+        """
+        return {
+            'current_time': self.current_time,
+            'hour': int((self.current_time / 60) % 24),
+
+            # Fleet state
+            'fleet': self.fleet,  # Keep reference for feature extraction
+
+            # Depot states
+            'depots': self.depots,  # Keep reference for feature extraction
+
+            # Active requests
+            'active_requests': self.active_requests,  # Keep reference for feature extraction
+
+            # Aggregate metrics for quick access
+            'metrics': {
+                'available_vehicles': len(self.fleet.get_available_vehicles()),
+                'pending_requests': len([r for r in self.active_requests.values() if r.is_pending]),
+                'avg_battery': np.mean([v.battery_soc for v in self.fleet.vehicles.values()]) if self.fleet.vehicles else 0.0,
+                'total_completed': len(self.completed_requests),
+                'total_cancelled': len(self.cancelled_requests),
+            }
+        }
+
+    def _calculate_step_reward(self) -> float:
+        """
+        Calculate reward for the current timestep.
+
+        Multi-objective reward combining:
+        - Revenue from completed trips
+        - Penalty for request timeouts
+        - Penalty for low battery vehicles
+        - Energy cost
+
+        Returns:
+            Scalar reward value
+        """
+        # Track changes since last step
+        new_completed = len(self.completed_requests) - self.last_completed_count
+        new_timeouts = len(self.cancelled_requests) - self.last_timeout_count
+
+        # Update counters
+        self.last_completed_count = len(self.completed_requests)
+        self.last_timeout_count = len(self.cancelled_requests)
+
+        # Revenue from recent completions
+        recent_completed = self.completed_requests[-new_completed:] if new_completed > 0 else []
+        revenue = sum(r.fare for r in recent_completed)
+
+        # Penalties
+        timeout_penalty = new_timeouts * -10.0  # $10 penalty per timeout
+        low_battery_penalty = sum(-5.0 for v in self.fleet.vehicles.values() if v.battery_soc < 0.15)
+
+        # Utilization bonus (encourage keeping vehicles productive)
+        utilization_bonus = len([v for v in self.fleet.vehicles.values() if v.current_passenger_id is not None]) * 0.1
+
+        return revenue + timeout_penalty + low_battery_penalty + utilization_bonus
+
+    def export_training_data(self, filepath: str, format: str = 'json'):
+        """
+        Export collected training data to file.
+
+        Args:
+            filepath: Path to save file
+            format: 'json' or 'pickle'
+        """
+        if not self.collect_training_data:
+            raise ValueError("Training data collection was not enabled for this simulation")
+
+        import json
+        import pickle
+
+        data = {
+            'metadata': {
+                'simulation_duration_hours': self.simulation_duration_minutes / 60,
+                'optimization_mode': self.optimization_mode,
+                'fleet_size': self.fleet.size,
+                'num_depots': len(self.depots),
+                'model_type': self.optimization_model.__class__.__name__,
+                'total_requests': len(self.completed_requests) + len(self.cancelled_requests),
+                'completed_requests': len(self.completed_requests),
+                'service_level': len(self.completed_requests) / max(1, len(self.completed_requests) + len(self.cancelled_requests)),
+            },
+            'trajectory': self.training_trajectory,
+            'final_metrics': self.get_results()
+        }
+
+        if format == 'json':
+            # For JSON, we need to serialize the state snapshots more carefully
+            serializable_data = self._make_json_serializable(data)
+            with open(filepath, 'w') as f:
+                json.dump(serializable_data, f, indent=2)
+        elif format == 'pickle':
+            with open(filepath, 'wb') as f:
+                pickle.dump(data, f)
+        else:
+            raise ValueError(f"Unsupported format: {format}")
+
+    def _make_json_serializable(self, data: dict) -> dict:
+        """Convert data with object references to JSON-serializable format"""
+        import copy
+
+        serializable = copy.deepcopy(data['metadata'])
+        trajectory_serializable = []
+
+        for step in data['trajectory']:
+            serializable_step = {
+                'timestep': step['timestep'],
+                'time': step['time'],
+                'reward': step['reward'],
+                'actions': step['actions'],
+                'state_summary': {
+                    'hour': step['state']['hour'],
+                    'metrics': step['state']['metrics']
+                }
+            }
+            trajectory_serializable.append(serializable_step)
+
+        return {
+            'metadata': serializable,
+            'trajectory': trajectory_serializable
         }
