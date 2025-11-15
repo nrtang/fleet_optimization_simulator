@@ -55,8 +55,15 @@ class Config:
         sim = self.config['simulation']
         if 'duration_hours' not in sim:
             raise ConfigurationError("Missing simulation.duration_hours")
-        if 'time_step_minutes' not in sim:
-            raise ConfigurationError("Missing simulation.time_step_minutes")
+
+        # Validate optimization mode
+        opt_mode = sim.get('optimization_mode', 'fixed_interval')
+        if opt_mode not in ['fixed_interval', 'event_driven']:
+            raise ConfigurationError(f"Invalid optimization_mode: {opt_mode}. Must be 'fixed_interval' or 'event_driven'")
+
+        # time_step_minutes only required for fixed_interval mode
+        if opt_mode == 'fixed_interval' and 'time_step_minutes' not in sim:
+            raise ConfigurationError("Missing simulation.time_step_minutes for fixed_interval mode")
 
         # Validate fleet parameters
         fleet = self.config['fleet']
@@ -146,7 +153,8 @@ def create_default_config() -> Dict[str, Any]:
     return {
         'simulation': {
             'duration_hours': 24,
-            'time_step_minutes': 1.0,
+            'optimization_mode': 'fixed_interval',  # 'fixed_interval' or 'event_driven'
+            'time_step_minutes': 1.0,  # Only used for fixed_interval mode
             'travel_speed_kmh': 30.0,
             'random_seed': 42,
         },

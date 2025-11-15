@@ -1,7 +1,6 @@
 simulation:
   duration_hours: 24
-  optimization_mode: fixed_interval  # 'fixed_interval' or 'event_driven'
-  time_step_minutes: 1.0  # Only used for fixed_interval mode
+  optimization_mode: event_driven  # React immediately to state changes
   travel_speed_kmh: 30.0
   random_seed: 42
 
@@ -61,15 +60,16 @@ pricing:
   peak_multiplier: 1.5
 
 model:
-  type: rule_based
+  type: greedy
   config:
-    low_battery_threshold: 0.3
+    low_battery_threshold: 0.25
     charge_target_soc: 0.9
-    max_pickup_distance_km: 10.0
+    max_pickup_distance_km: 15.0
+    enable_repositioning: false
 
 output:
   save_results: true
-  output_dir: results/rule_based
+  output_dir: results/event_driven
   save_csv: true
   save_json: true
   generate_plots: true

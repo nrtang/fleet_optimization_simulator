@@ -179,17 +179,21 @@ def run_simulation(config_path: str, verbose: bool = True):
 
     # Create simulation engine
     sim_params = config.get_simulation_params()
+    opt_mode = sim_params.get('optimization_mode', 'fixed_interval')
 
     if verbose:
         print("Initializing simulation engine...")
+        print(f"Optimization mode: {opt_mode}")
+
     engine = SimulationEngine(
         fleet=fleet,
         depots=depots,
         demand_generator=demand_generator,
         optimization_model=optimization_model,
-        time_step_minutes=sim_params['time_step_minutes'],
+        time_step_minutes=sim_params.get('time_step_minutes', 1.0),
         simulation_duration_hours=sim_params['duration_hours'],
-        travel_speed_kmh=sim_params.get('travel_speed_kmh', 30.0)
+        travel_speed_kmh=sim_params.get('travel_speed_kmh', 30.0),
+        optimization_mode=opt_mode
     )
 
     # Run simulation

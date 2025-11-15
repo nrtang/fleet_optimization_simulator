@@ -60,6 +60,7 @@ class SimulationEngine:
         simulation_duration_hours: float = 24.0,
         distance_func: Optional[Callable] = None,
         travel_speed_kmh: float = 30.0,
+        optimization_mode: str = 'fixed_interval',
     ):
         """
         Initialize simulation engine.
@@ -69,10 +70,11 @@ class SimulationEngine:
             depots: List of Depot objects
             demand_generator: DemandGenerator object
             optimization_model: Optimization model for decision-making
-            time_step_minutes: Time step for optimization decisions
+            time_step_minutes: Time step for optimization decisions (fixed_interval mode only)
             simulation_duration_hours: Total simulation duration
             distance_func: Function to calculate distance between coordinates
             travel_speed_kmh: Average travel speed
+            optimization_mode: 'fixed_interval' or 'event_driven'
         """
         self.fleet = fleet
         self.depots = {depot.id: depot for depot in depots}
@@ -82,6 +84,7 @@ class SimulationEngine:
         self.simulation_duration_minutes = simulation_duration_hours * 60
         self.distance_func = distance_func or self._haversine_distance
         self.travel_speed_kmh = travel_speed_kmh
+        self.optimization_mode = optimization_mode
 
         # Simulation state
         self.current_time = 0.0
@@ -116,23 +119,25 @@ class SimulationEngine:
         """Initialize the event queue with recurring events"""
         # Schedule demand generation events
         time = 0.0
+        demand_interval = self.time_step_minutes if self.optimization_mode == 'fixed_interval' else 1.0
         while time < self.simulation_duration_minutes:
             self._add_event(Event(
                 time=time,
                 event_type=EventType.GENERATE_DEMAND,
                 data={}
             ))
-            time += self.time_step_minutes
+            time += demand_interval
 
-        # Schedule optimization steps
-        time = 0.0
-        while time < self.simulation_duration_minutes:
-            self._add_event(Event(
-                time=time,
-                event_type=EventType.OPTIMIZATION_STEP,
-                data={}
-            ))
-            time += self.time_step_minutes
+        # Schedule optimization steps (only for fixed_interval mode)
+        if self.optimization_mode == 'fixed_interval':
+            time = 0.0
+            while time < self.simulation_duration_minutes:
+                self._add_event(Event(
+                    time=time,
+                    event_type=EventType.OPTIMIZATION_STEP,
+                    data={}
+                ))
+                time += self.time_step_minutes
 
         # Schedule simulation end
         self._add_event(Event(
@@ -150,6 +155,18 @@ class SimulationEngine:
         if self.event_queue:
             return heapq.heappop(self.event_queue)
         return None
+
+    def _trigger_optimization_if_event_driven(self):
+        """
+        Trigger optimization step if in event-driven mode.
+
+        Called when state changes that might warrant re-optimization:
+        - Vehicle becomes available
+        - New requests arrive
+        - Depot slot becomes available
+        """
+        if self.optimization_mode == 'event_driven':
+            self._handle_optimization_step(None)
 
     def calculate_travel_time(self, distance_km: float) -> float:
         """Calculate travel time in minutes"""
@@ -193,9 +210,10 @@ class SimulationEngine:
 
     def _handle_generate_demand(self, event: Event):
         """Handle demand generation event"""
+        demand_interval = self.time_step_minutes if self.optimization_mode == 'fixed_interval' else 1.0
         new_requests = self.demand_generator.generate_requests(
             self.current_time,
-            self.time_step_minutes
+            demand_interval
         )
 
         for request in new_requests:
@@ -208,6 +226,10 @@ class SimulationEngine:
                 event_type=EventType.REQUEST_TIMEOUT,
                 data={'request_id': request.request_id}
             ))
+
+        # Trigger optimization if we have new requests and in event-driven mode
+        if new_requests:
+            self._trigger_optimization_if_event_driven()
 
     def _handle_optimization_step(self, event: Event):
         """Handle optimization decision-making"""
@@ -334,6 +356,9 @@ class SimulationEngine:
             # Clear assignments
             vehicle.assigned_request_id = None
 
+            # Vehicle is now available - trigger optimization if event-driven
+            self._trigger_optimization_if_event_driven()
+
     def _handle_vehicle_arrives_at_depot(self, event: Event):
         """Handle vehicle arrival at depot"""
         vehicle_id = event.data['vehicle_id']
@@ -389,8 +414,23 @@ class SimulationEngine:
             vehicle.status = VehicleStatus.IDLE
             vehicle.assigned_depot_id = None
 
-            # Process queue
+            # Process queue (may free up slots for other vehicles)
             depot.process_queue(self.current_time)
+
+            # Vehicle is now available - trigger optimization if event-driven
+            self._trigger_optimization_if_event_driven()
+
+    def _handle_vehicle_arrives_at_reposition(self, event: Event):
+        """Handle vehicle arrival at reposition location"""
+        vehicle_id = event.data['vehicle_id']
+        vehicle = self.fleet.get_vehicle(vehicle_id)
+
+        if vehicle:
+            # Vehicle finishes repositioning and becomes available
+            vehicle.status = VehicleStatus.IDLE
+
+            # Trigger optimization - vehicle is now available in new location
+            self._trigger_optimization_if_event_driven()
 
     def _handle_request_timeout(self, event: Event):
         """Handle request timeout"""
@@ -428,6 +468,8 @@ class SimulationEngine:
             self._handle_vehicle_arrives_at_dropoff(event)
         elif event.event_type == EventType.VEHICLE_ARRIVES_AT_DEPOT:
             self._handle_vehicle_arrives_at_depot(event)
+        elif event.event_type == EventType.VEHICLE_ARRIVES_AT_REPOSITION:
+            self._handle_vehicle_arrives_at_reposition(event)
         elif event.event_type == EventType.VEHICLE_CHARGING_COMPLETE:
             self._handle_vehicle_charging_complete(event)
         elif event.event_type == EventType.REQUEST_TIMEOUT:

@@ -1,6 +1,7 @@
 simulation:
   duration_hours: 24
-  time_step_minutes: 1.0
+  optimization_mode: fixed_interval  # 'fixed_interval' or 'event_driven'
+  time_step_minutes: 1.0  # Only used for fixed_interval mode
   travel_speed_kmh: 30.0
   random_seed: 42
 

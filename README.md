@@ -65,7 +65,11 @@ python -m fleet_optimizer.cli run configs/default.yaml
 ### 3. Compare Different Strategies
 
 ```bash
+# Compare rule-based vs greedy models
 python -m fleet_optimizer.cli compare configs/rule_based.yaml configs/default.yaml -o comparison.csv
+
+# Compare fixed-interval vs event-driven optimization
+python -m fleet_optimizer.cli compare configs/default.yaml configs/event_driven.yaml -o mode_comparison.csv
 ```
 
 ## Configuration
@@ -77,11 +81,24 @@ Simulations are configured using YAML files. See `configs/default.yaml` for a co
 #### Simulation Parameters
 ```yaml
 simulation:
-  duration_hours: 24        # Simulation duration
-  time_step_minutes: 1.0    # Decision-making frequency
-  travel_speed_kmh: 30.0    # Average travel speed
-  random_seed: 42           # For reproducibility
+  duration_hours: 24                # Simulation duration
+  optimization_mode: fixed_interval # 'fixed_interval' or 'event_driven'
+  time_step_minutes: 1.0           # Decision frequency (fixed_interval only)
+  travel_speed_kmh: 30.0           # Average travel speed
+  random_seed: 42                  # For reproducibility
 ```
+
+**Optimization Modes:**
+- **`fixed_interval`**: Model makes decisions at fixed time intervals (e.g., every minute)
+  - More predictable computational cost
+  - May miss immediate opportunities between decision points
+
+- **`event_driven`**: Model reacts immediately when state changes occur:
+  - Vehicle completes dropoff (becomes available)
+  - Vehicle finishes charging (becomes available)
+  - New ride requests arrive
+  - Depot slots become available
+  - More reactive but higher computational cost
 
 #### Service Area
 ```yaml
