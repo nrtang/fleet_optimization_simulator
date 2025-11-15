@@ -400,11 +400,23 @@ class SimulationEngine:
         depot = self.depots.get(depot_id)
 
         if vehicle and depot:
-            # Calculate energy added and cost
-            slot = depot.release_vehicle_from_slot(vehicle_id)
-            if slot:
-                charge_duration = self.current_time - slot.charge_start_time
-                energy_added = vehicle.charge(charge_duration, slot.charging_power_kw)
+            # Find the slot and get charging info BEFORE releasing
+            charge_start_time = None
+            charging_power_kw = None
+
+            for slot in depot.slots:
+                if slot.vehicle_id == vehicle_id:
+                    charge_start_time = slot.charge_start_time
+                    charging_power_kw = slot.charging_power_kw
+                    break
+
+            # Release the slot (this resets charge_start_time to None)
+            depot.release_vehicle_from_slot(vehicle_id)
+
+            # Calculate energy added and cost using saved values
+            if charge_start_time is not None and charging_power_kw is not None:
+                charge_duration = self.current_time - charge_start_time
+                energy_added = vehicle.charge(charge_duration, charging_power_kw)
 
                 # Calculate cost
                 hour = int((self.current_time / 60) % 24)
