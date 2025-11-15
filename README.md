@@ -72,6 +72,56 @@ python -m fleet_optimizer.cli compare configs/rule_based.yaml configs/default.ya
 python -m fleet_optimizer.cli compare configs/default.yaml configs/event_driven.yaml -o mode_comparison.csv
 ```
 
+## Interactive Web UI
+
+The simulator includes a Streamlit-based web interface for easy experimentation and comparison of different optimization strategies.
+
+### Launch the UI
+
+```bash
+streamlit run app.py
+```
+
+The interface will open in your browser at `http://localhost:8501`
+
+### Features
+
+- **Model Selection**: Choose between rule-based and greedy optimization models
+- **Optimization Mode**: Switch between fixed-interval and event-driven modes
+- **Parameter Configuration**: Adjust fleet size, demand, duration, battery thresholds via interactive sliders
+- **Real-time Simulation**: Run simulations with custom configurations
+- **Scenario Comparison**: Compare multiple runs side-by-side with visual charts
+- **Metrics Dashboard**: View detailed performance metrics in organized tabs
+- **Export Results**: Download comparison data as CSV
+
+### Using the UI
+
+1. **Configure Parameters** (left sidebar):
+   - Select optimization model (rule-based or greedy)
+   - Choose optimization mode (fixed interval or event-driven)
+   - Adjust model-specific parameters
+   - Set simulation parameters (duration, fleet size, demand)
+   - Optionally tune advanced parameters
+
+2. **Run Simulation**:
+   - Give your scenario a descriptive name
+   - Click "Run Simulation"
+   - Results will be added to comparison view
+
+3. **Compare Results** (main area):
+   - **Comparison Tab**: Visual bar charts comparing key metrics across scenarios
+   - **Detailed Metrics Tab**: In-depth metrics for selected scenario
+   - **Individual Results Tab**: Configuration and raw data for each run
+
+4. **Download Data**:
+   - Export comparison table as CSV for further analysis
+
+The UI is perfect for:
+- Quick experimentation with different parameters
+- Visual comparison of optimization strategies
+- Demonstrating the simulator to stakeholders
+- Educational purposes and learning how different parameters affect performance
+
 ## Configuration
 
 Simulations are configured using YAML files. See `configs/default.yaml` for a complete example.
@@ -493,7 +543,7 @@ Contributions welcome! Areas for enhancement:
 - More sophisticated charging curves
 - Real-time traffic integration
 - Multi-modal fleet support
-- Web-based dashboard
+- Enhanced UI features (real-time monitoring, custom visualizations)
 
 ## License
 
