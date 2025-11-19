@@ -304,10 +304,13 @@ Energy Consumed: {self.metrics['fleet']['total_energy_consumed_kwh']:.1f} kWh
         if not self.metrics:
             self.calculate_all_metrics()
 
+        # Create a copy of results without training_data (not JSON serializable)
+        results_copy = {k: v for k, v in self.results.items() if k != 'training_data'}
+
         with open(filepath, 'w') as f:
             json.dump({
                 'metrics': self.metrics,
-                'results': self.results,
+                'results': results_copy,
             }, f, indent=2)
 
 
