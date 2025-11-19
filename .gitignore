@@ -53,5 +53,8 @@ Thumbs.db
 .coverage
 htmlcov/
 
+#Training Data
+/training_data
+
 # Logs
 *.log
