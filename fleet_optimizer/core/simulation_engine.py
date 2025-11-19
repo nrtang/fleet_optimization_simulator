@@ -362,16 +362,16 @@ class SimulationEngine:
         request = self.active_requests.get(request_id)
 
         if vehicle and request:
-            # Calculate fare
+            # Complete trip first (sets dropoff_time)
+            request.complete_trip(self.current_time)
+            vehicle.drop_off_passenger()
+
+            # Calculate fare after dropoff_time is set
             distance_km = self.distance_func(
                 request.pickup_location,
                 request.dropoff_location
             )
             request.calculate_fare(distance_km)
-
-            # Complete trip
-            request.complete_trip(self.current_time)
-            vehicle.drop_off_passenger()
 
             # Move request to completed
             del self.active_requests[request_id]
