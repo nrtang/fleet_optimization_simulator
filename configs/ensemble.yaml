@@ -1,0 +1,110 @@
+simulation:
+  duration_hours: 24
+  optimization_mode: fixed_interval  # 'fixed_interval' or 'event_driven'
+  time_step_minutes: 1.0  # Only used for fixed_interval mode
+  travel_speed_kmh: 30.0
+  random_seed: 42
+
+service_area:
+  name: San Francisco
+  min_lat: 37.7
+  max_lat: 37.8
+  min_lon: -122.5
+  max_lon: -122.4
+
+fleet:
+  num_vehicles: 100
+  initial_battery_soc: 0.8
+  vehicle_specs:
+    battery_capacity_kwh: 75.0
+    range_km: 400.0
+    charging_rate_kw: 150.0
+    passenger_capacity: 4
+    efficiency_kwh_per_km: 0.19
+
+depots:
+  - depot_id: depot_1
+    location: [37.75, -122.45]
+    num_fast_chargers: 20
+    num_slow_chargers: 10
+    fast_charger_power_kw: 150.0
+    slow_charger_power_kw: 50.0
+    max_power_capacity_kw: 3500.0
+
+  - depot_id: depot_2
+    location: [37.77, -122.43]
+    num_fast_chargers: 15
+    num_slow_chargers: 15
+    fast_charger_power_kw: 150.0
+    slow_charger_power_kw: 50.0
+    max_power_capacity_kw: 3000.0
+
+demand:
+  base_demand_per_hour: 200.0
+  use_default_pattern: true
+  demand_zones:
+    - zone_id: downtown
+      center: [37.75, -122.45]
+      radius_km: 2.0
+      base_demand_rate: 100.0
+
+    - zone_id: mission
+      center: [37.76, -122.42]
+      radius_km: 1.5
+      base_demand_rate: 80.0
+
+  special_events: []
+
+pricing:
+  base_rate_per_kwh: 0.12
+  peak_hours: [9, 10, 11, 12, 13, 14, 15, 16, 17]
+  peak_multiplier: 1.5
+
+model:
+  type: ensemble
+  config:
+    # Aggregation strategy: 'voting', 'weighted', or 'cascade'
+    aggregation_strategy: weighted
+
+    # Model weights (must sum to 1.0, or will be normalized)
+    # Order: [rule_based, greedy, neural_network (if used), dqn (if used)]
+    weights: [0.1, 0.5, 0.2, 0.2]
+
+    # Enable/disable specific models
+    use_greedy: true
+    use_neural_network: false  # Set to true if you have trained model
+    use_dqn: false  # Set to true if you have trained model
+
+    # Configuration for rule-based model
+    rule_based_config:
+      low_battery_threshold: 0.25
+      charge_target_soc: 0.9
+
+    # Configuration for greedy model
+    greedy_config:
+      low_battery_threshold: 0.25
+      charge_target_soc: 0.9
+      max_pickup_distance_km: 15.0
+      enable_repositioning: false
+
+    # Configuration for neural network model (if enabled)
+    neural_network_config:
+      model_path: trained_models/neural_network_model.pt
+      low_battery_threshold: 0.25
+      max_pickup_distance_km: 15.0
+      temperature: 1.0
+
+    # Configuration for DQN model (if enabled)
+    dqn_config:
+      model_path: trained_models/dqn_model.pt
+      training_mode: false
+      epsilon: 0.05
+      low_battery_threshold: 0.25
+      max_pickup_distance_km: 15.0
+
+output:
+  save_results: true
+  output_dir: results
+  save_csv: true
+  save_json: true
+  generate_plots: true

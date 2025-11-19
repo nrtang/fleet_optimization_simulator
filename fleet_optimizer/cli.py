@@ -143,6 +143,18 @@ def create_optimization_model_from_config(config: Config):
         return RuleBasedModel(model_config)
     elif model_type == 'greedy':
         return GreedyModel(model_config)
+    elif model_type == 'neural_network':
+        from fleet_optimizer.models import NeuralNetworkModel
+        return NeuralNetworkModel(model_config)
+    elif model_type == 'dqn':
+        from fleet_optimizer.models import DQNModel
+        return DQNModel(model_config)
+    elif model_type == 'ensemble':
+        from fleet_optimizer.models import EnsembleModel
+        return EnsembleModel(model_config)
+    elif model_type == 'adaptive_ensemble':
+        from fleet_optimizer.models import AdaptiveEnsembleModel
+        return AdaptiveEnsembleModel(model_config)
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 
