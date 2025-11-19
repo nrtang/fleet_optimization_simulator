@@ -158,8 +158,11 @@ def plot_comparison_metrics(comparison_df):
 
 
 # Main UI
-st.title("🚗 Fleet Optimization Simulator")
-st.markdown("Compare different optimization algorithms and configurations")
+st.title("🚗 EV Autonomous Fleet Optimization Simulator")
+st.markdown("""
+**Interactive platform for comparing optimization algorithms and fleet configurations**
+Simulate electric autonomous vehicle operations with realistic demand, battery management, and charging infrastructure.
+""")
 
 # Sidebar for configuration
 st.sidebar.header("Configuration")
@@ -275,31 +278,108 @@ if len(st.session_state.results) == 0:
     st.info("👈 Configure parameters in the sidebar and click 'Run Simulation' to get started!")
 
     st.markdown("""
+    ## About the Simulator
+
+    This is a **discrete-event simulation** for optimizing electric autonomous vehicle (EV) fleets. The simulator models
+    realistic operations including vehicle dispatch, battery management, charging infrastructure, and passenger demand patterns
+    to help compare different optimization strategies and fleet configurations.
+
+    ### What It Does
+
+    The simulator models a 24-hour (or shorter) period of autonomous EV fleet operations in a city service area. It:
+    - Generates realistic ride requests based on time-of-day patterns and geographic zones
+    - Simulates vehicle movements, battery depletion, and charging
+    - Tests different optimization algorithms for vehicle dispatch and charging decisions
+    - Tracks comprehensive performance metrics to evaluate fleet efficiency
+
+    ---
+
+    ## 📥 Inputs
+
+    ### Optimization Configuration
+
+    **Optimization Model** - The algorithm used for fleet decision-making:
+    - **Rule-Based**: Simple heuristic model (charge when low, pick up nearest request)
+    - **Greedy**: Profit-optimizing model with smart vehicle-request matching
+    - *(Custom ML models can be added - see documentation)*
+
+    **Optimization Mode** - When decisions are made:
+    - **Fixed Interval**: Model makes decisions at regular intervals (e.g., every 1 minute)
+    - **Event-Driven**: Model reacts immediately to state changes (vehicle available, request arrives, etc.)
+
+    ### Fleet Parameters
+
+    - **Number of Vehicles** (10-200): Size of the autonomous fleet
+    - **Initial Battery SOC** (0.5-1.0): Starting battery state of charge for all vehicles
+    - Vehicle specs: 75 kWh battery, 400 km range, 150 kW fast charging
+
+    ### Demand Parameters
+
+    - **Demand Rate** (50-500 requests/hour): Base passenger demand rate
+    - Time-of-day patterns: Automatic peak/off-peak variations
+    - Geographic distribution: Requests concentrated in defined zones
+
+    ### Charging Infrastructure
+
+    - **Fast Chargers** (5-50): 150 kW charging power per slot
+    - **Slow Chargers** (5-50): 50 kW charging power per slot
+    - Dynamic electricity pricing: Peak hours (9 AM - 6 PM) cost 1.5x base rate
+
+    ### Simulation Settings
+
+    - **Duration** (1-24 hours): Length of simulation period
+    - **Travel Speed** (20-50 km/h): Average vehicle speed (accounts for traffic)
+    - **Time Step** (0.5-5 min): Decision frequency for fixed-interval mode
+    - **Random Seed**: For reproducible results
+
+    ---
+
+    ## 📤 Outputs
+
+    ### Primary Metrics (Profitability & Service)
+
+    - **Fleet Utilization** (%): Percentage of time vehicles spend carrying passengers
+      - *Higher is better* - indicates efficient vehicle usage
+
+    - **Service Level** (%): Percentage of ride requests fulfilled within time threshold
+      - *Higher is better* - measures customer satisfaction
+
+    - **Revenue per Mile** ($/mile): Total revenue divided by total miles driven
+      - *Higher is better* - indicates profitable operations
+
+    - **Total Revenue** ($): Cumulative fare revenue from completed trips
+
+    ### Secondary Metrics (Efficiency & Cost)
+
+    - **Energy Cost per Mile** ($/mile): Electricity cost per mile traveled
+      - *Lower is better* - indicates energy efficiency
+
+    - **Empty Miles Ratio** (%): Percentage of miles driven without passengers
+      - *Lower is better* - less deadheading improves efficiency
+
+    - **Average Wait Time** (minutes): Mean time from request to pickup
+      - *Lower is better* - impacts customer experience
+
+    ### Tertiary Metrics (Operations)
+
+    - **Revenue per Vehicle per Day** ($): Average daily revenue per vehicle
+    - **Trips per Vehicle**: Average completed trips per vehicle
+    - **Depot Utilization** (%): Charging infrastructure usage
+    - **Battery Statistics**: Min/max/average battery levels across fleet
+    - **Distance Statistics**: Total, with-passenger, and empty miles
+    - **Energy Consumption**: Total kWh consumed by the fleet
+
+    ---
+
     ### Quick Start Guide
 
     1. **Select a Model**: Choose between rule-based (simple) or greedy (profit-optimizing)
     2. **Choose Optimization Mode**: Fixed interval or event-driven
     3. **Configure Parameters**: Adjust fleet size, demand, duration, etc.
     4. **Run Simulation**: Click the button to run
-    5. **Compare Results**: Run multiple scenarios and compare
+    5. **Compare Results**: Run multiple scenarios and compare performance
 
-    ### Model Descriptions
-
-    **Rule-Based Model**
-    - Simple if/then logic
-    - Charges when battery < threshold
-    - Picks up nearest request
-    - Fast and predictable
-
-    **Greedy Model**
-    - Profit-based optimization
-    - Considers revenue vs costs
-    - Global vehicle-request matching
-    - More sophisticated decisions
-
-    **Optimization Modes**
-    - **Fixed Interval**: Decisions every N minutes (e.g., every 1 minute)
-    - **Event-Driven**: React immediately when vehicles become available or requests arrive
+    💡 **Tip**: Start with default settings, then experiment with fleet size and demand to see how performance changes!
     """)
 
 else:
